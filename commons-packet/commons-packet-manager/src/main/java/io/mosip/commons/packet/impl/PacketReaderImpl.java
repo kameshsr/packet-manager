@@ -234,6 +234,7 @@ public class PacketReaderImpl implements IPacketReader {
 
 		try {
 			BIR bir = loadBiometricsFromObjectStore(id, biometricFieldName, source, process, byPassCache);
+			LOGGER.info("biometricRecord :: " + bir);
 			biometricRecord = new BiometricRecord();
 			if(bir.getOthers() != null) {
 				HashMap<String, String> others = new HashMap<>();
@@ -303,21 +304,31 @@ public class PacketReaderImpl implements IPacketReader {
 		String fileName = null;
 
 		String bioString = packetReader.getField(id, biometricFieldName, source, process, false);//(String) idobjectMap.get(biometricFieldName);
+		LOGGER.info("biometricFieldName :: " + biometricFieldName + " bioString :: " + bioString);
 		JSONObject biometricMap = null;
 		if (bioString != null)
 			biometricMap = new JSONObject(bioString);
+		LOGGER.info("biometricMap :: " + biometricMap);
 		if (bioString == null || biometricMap == null || biometricMap.isNull(VALUE)) {
+			LOGGER.info("biometricMap is null or value is null for biometricFieldName :: " + biometricFieldName);
 			// biometric file not present in idobject. Search in meta data.
 			Map<String, String> metadataMap = getMetaInfo(id, source, process);
+			LOGGER.info("metadataMap :: " + metadataMap);
 			String operationsData = metadataMap.get(META_INFO_OPERATIONS_DATA);
+			LOGGER.info("operationsData :: " + operationsData);
 			if (StringUtils.isNotEmpty(operationsData)) {
+				LOGGER.info("Searching in operationsData for biometricFieldName :: " + biometricFieldName);
 				JSONArray jsonArray = new JSONArray(operationsData);
+				LOGGER.info("jsonArray :: " + jsonArray);
 				for (int i = 0; i < jsonArray.length(); i++) {
+					LOGGER.info("jsonArray.get(i) :: " + jsonArray.get(i));
 					JSONObject jsonObject = (JSONObject) jsonArray.get(i);
 					if (jsonObject.has(LABEL)
 							&& jsonObject.get(LABEL).toString().equalsIgnoreCase(biometricFieldName)) {
 						packetName = ID;
+						LOGGER.info("packetName :: " + packetName);
 						fileName = jsonObject.isNull(VALUE) ? null : jsonObject.get(VALUE).toString();
+						LOGGER.info("fileName :: " + fileName);
 						break;
 					}
 				}
@@ -325,9 +336,13 @@ public class PacketReaderImpl implements IPacketReader {
 		} else {
 			String idSchemaVersion = packetReader.getField(id,
 					idSchemaUtils.getIdschemaVersionFromMappingJson(), source, process, false);
+			LOGGER.info("idSchemaVersion :: " + idSchemaVersion);
 			Double schemaVersion = idSchemaVersion != null ? Double.valueOf(idSchemaVersion) : null;
+			LOGGER.info("schemaVersion :: " + schemaVersion);
 			packetName = idSchemaUtils.getSource(biometricFieldName, schemaVersion);
+			LOGGER.info("packetName :: " + packetName);
 			fileName = biometricMap.get(VALUE).toString();
+			LOGGER.info("packetName :: " + packetName + ", fileName :: " + fileName);
 		}
 
 		if (packetName == null || fileName == null)
