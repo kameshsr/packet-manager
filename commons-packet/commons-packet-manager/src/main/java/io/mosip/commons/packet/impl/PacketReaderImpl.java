@@ -329,40 +329,32 @@ public class PacketReaderImpl implements IPacketReader {
 		String packetName = null;
 		String fileName = null;
 
-		LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-				"Loading biometrics for field: " + biometricFieldName + ", source: " + source + ", process: " + process);
-
-		String bioString = packetReader.getField(id, biometricFieldName, source, process, false);
-		LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-				"BioString retrieved: " + bioString);
-
+		String bioString = packetReader.getField(id, biometricFieldName, source, process, false);//(String) idobjectMap.get(biometricFieldName);
+		LOGGER.info("bioString: {}", bioString);
 		JSONObject biometricMap = null;
 		if (bioString != null)
 			biometricMap = new JSONObject(bioString);
-
 		if (bioString == null || biometricMap == null || biometricMap.isNull(VALUE)) {
-			LOGGER.warn(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"BioString or VALUE in biometricMap is null. Falling back to metadata.");
-
+			// biometric file not present in idobject. Search in meta data.
 			Map<String, String> metadataMap = getMetaInfo(id, source, process);
-			LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"MetadataMap: " + metadataMap);
-
+			LOGGER.info("metadataMap: {}", metadataMap);
 			String operationsData = metadataMap.get(META_INFO_OPERATIONS_DATA);
-			LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"operationsData: " + operationsData);
-
+			LOGGER.info("operationsData: {}", operationsData);
 			if (StringUtils.isNotEmpty(operationsData)) {
+				LOGGER.info("Searching in operations data for biometric field: {}", biometricFieldName);
 				JSONArray jsonArray = new JSONArray(operationsData);
+				LOGGER.info("jsonArray length: {}", jsonArray.length());
+				LOGGER.info("jsonArray: {}", jsonArray.toString());
 				for (int i = 0; i < jsonArray.length(); i++) {
-					JSONObject jsonObject = jsonArray.getJSONObject(i);
+					LOGGER.info("Processing JSON object at index: {}", i);
+					JSONObject jsonObject = (JSONObject) jsonArray.get(i);
+					LOGGER.info("jsonObject: {}", jsonObject.toString());
 					if (jsonObject.has(LABEL)
 							&& jsonObject.get(LABEL).toString().equalsIgnoreCase(biometricFieldName)) {
 						packetName = ID;
+						LOGGER.info("Found matching label: {}", biometricFieldName);
 						fileName = jsonObject.isNull(VALUE) ? null : jsonObject.get(VALUE).toString();
-
-						LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-								"Found biometric in metadata - packetName: " + packetName + ", fileName: " + fileName);
+						LOGGER.info("fileName: {}", fileName);
 						break;
 					}
 				}
@@ -370,45 +362,25 @@ public class PacketReaderImpl implements IPacketReader {
 		} else {
 			String idSchemaVersion = packetReader.getField(id,
 					idSchemaUtils.getIdschemaVersionFromMappingJson(), source, process, false);
-			LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"idSchemaVersion: " + idSchemaVersion);
-
+			LOGGER.info("idSchemaVersion: {}", idSchemaVersion);
 			Double schemaVersion = idSchemaVersion != null ? Double.valueOf(idSchemaVersion) : null;
-
+			LOGGER.info("schemaVersion: {}", schemaVersion);
 			packetName = idSchemaUtils.getSource(biometricFieldName, schemaVersion);
+			LOGGER.info("packetName: {}", packetName);
 			fileName = biometricMap.get(VALUE).toString();
-
-			LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"Biometric field found directly - packetName: " + packetName + ", fileName: " + fileName);
+			LOGGER.info("fileName from biometricMap: {}", fileName);
 		}
 
-		if (packetName == null || fileName == null) {
-			LOGGER.warn(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"packetName or fileName is null. Returning null BIR.");
+		if (packetName == null || fileName == null)
 			return null;
-		}
 
 		Packet packet = packetKeeper.getPacket(getPacketInfo(id, packetName, source, process));
-		LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-				"Packet fetched: " + (packet != null));
-
 		InputStream biometrics = ZipUtils.unzipAndGetFile(packet.getPacket(), fileName);
-		LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-				"Biometric InputStream retrieved: " + (biometrics != null));
-
-		if (biometrics == null) {
-			LOGGER.warn(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-					"Biometric file not found in zip. Returning null BIR.");
+		if (biometrics == null)
 			return null;
-		}
 
-		byte[] biometricBytes = IOUtils.toByteArray(biometrics);
-		LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
-				"Biometric file byte length: " + (biometricBytes != null ? biometricBytes.length : "null"));
-
-		return CbeffValidator.getBIRFromXML(biometricBytes);
+		return CbeffValidator.getBIRFromXML(IOUtils.toByteArray(biometrics));
 	}
-
 
 	@Override
 	public Map<String, String> getMetaInfo(String id, String source, String process) {
