@@ -141,51 +141,111 @@ public class PacketKeeper {
      */
     public Packet getPacket(PacketInfo packetInfo) throws PacketKeeperException {
         try {
-            InputStream is = getAdapter().getObject(PACKET_MANAGER_ACCOUNT, packetInfo.getId(), packetInfo.getSource(),
-                    packetInfo.getProcess(), getName(packetInfo.getId(), packetInfo.getPacketName()));
+            System.out.println("===== getPacket() START =====");
+            System.out.println("PacketInfo ID: " + packetInfo.getId());
+            System.out.println("PacketInfo Source: " + packetInfo.getSource());
+            System.out.println("PacketInfo Process: " + packetInfo.getProcess());
+            System.out.println("PacketInfo PacketName: " + packetInfo.getPacketName());
+
+            String objectName = getName(packetInfo.getId(), packetInfo.getPacketName());
+            System.out.println("Generated Object Name: " + objectName);
+
+            InputStream is = getAdapter().getObject(
+                    PACKET_MANAGER_ACCOUNT,
+                    packetInfo.getId(),
+                    packetInfo.getSource(),
+                    packetInfo.getProcess(),
+                    objectName);
+
+            System.out.println("InputStream received: " + (is != null));
+
             if (is == null) {
-                LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID,
-                        getName(packetInfo.getId(), packetInfo.getPacketName()), packetInfo.getProcess() + " Packet is not present in packet store.");
-                throw new PacketKeeperException(ErrorCode.PACKET_NOT_FOUND.getErrorCode(), ErrorCode.PACKET_NOT_FOUND.getErrorMessage());
+                System.out.println("Packet not found in packet store.");
+                throw new PacketKeeperException(
+                        ErrorCode.PACKET_NOT_FOUND.getErrorCode(),
+                        ErrorCode.PACKET_NOT_FOUND.getErrorMessage());
             }
+
             byte[] encryptedSubPacket = IOUtils.toByteArray(is);
+            System.out.println("Encrypted SubPacket length: " + encryptedSubPacket.length);
 
             Packet packet = new Packet();
-            Map<String, Object> metaInfo = getAdapter().getMetaData(PACKET_MANAGER_ACCOUNT, packetInfo.getId(),
-                    packetInfo.getSource(), packetInfo.getProcess(), getName(packetInfo.getId(), packetInfo.getPacketName()));
-            if (metaInfo != null && !metaInfo.isEmpty())
+
+            Map<String, Object> metaInfo = getAdapter().getMetaData(
+                    PACKET_MANAGER_ACCOUNT,
+                    packetInfo.getId(),
+                    packetInfo.getSource(),
+                    packetInfo.getProcess(),
+                    objectName);
+
+            System.out.println("MetaInfo fetched: " + metaInfo);
+
+            if (metaInfo != null && !metaInfo.isEmpty()) {
+                System.out.println("MetaInfo is present. Converting to PacketInfo...");
                 packet.setPacketInfo(PacketManagerHelper.getPacketInfo(metaInfo));
-            else {
-                LOGGER.info(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID,
-                        getName(packetInfo.getId(), packetInfo.getPacketName()), "metainfo not found for this packet");
+            } else {
+                System.out.println("MetaInfo NOT found. Using input PacketInfo.");
                 packet.setPacketInfo(packetInfo);
             }
-            byte[] subPacket = getCryptoService().decrypt(helper.getRefId(
-                    packet.getPacketInfo().getId(), packet.getPacketInfo().getRefId()), encryptedSubPacket);
+
+            System.out.println("PacketInfo after setting: " + packet.getPacketInfo());
+
+            String refId = helper.getRefId(
+                    packet.getPacketInfo().getId(),
+                    packet.getPacketInfo().getRefId());
+
+            System.out.println("Generated RefId for decryption: " + refId);
+
+            byte[] subPacket = getCryptoService().decrypt(refId, encryptedSubPacket);
+            System.out.println("Decrypted SubPacket length: " + subPacket.length);
+
             packet.setPacket(subPacket);
+            System.out.println("Packet data set successfully.");
 
+            boolean signatureValid = checkSignature(packet, encryptedSubPacket);
+            System.out.println("Signature validation result: " + signatureValid);
 
-			if (!checkSignature(packet, encryptedSubPacket)) {
-                LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID,
-                        getName(packet.getPacketInfo().getId(), packetInfo.getPacketName()), "Packet Integrity and Signature check failed");
+            if (!signatureValid) {
+                System.out.println("Packet Integrity and Signature check failed");
                 throw new PacketIntegrityFailureException();
             }
 
+            System.out.println("===== getPacket() SUCCESS =====");
             return packet;
+
         } catch (Exception e) {
-            LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, packetInfo.getId(), ExceptionUtils.getStackTrace(e));
-            if (e.getMessage() != null && e.getMessage().contains(OBJECT_DOESNOT_EXISTS) && e.getMessage().contains(STATUS_404))
+            System.out.println("===== getPacket() EXCEPTION =====");
+            System.out.println("Exception Type: " + e.getClass().getName());
+            System.out.println("Exception Message: " + e.getMessage());
+            e.printStackTrace();
+
+            if (e.getMessage() != null
+                    && e.getMessage().contains(OBJECT_DOESNOT_EXISTS)
+                    && e.getMessage().contains(STATUS_404)) {
+
+                System.out.println("Throwing ObjectDoesnotExistsException");
                 throw new ObjectDoesnotExistsException();
-            else if (e instanceof BaseCheckedException) {
+
+            } else if (e instanceof BaseCheckedException) {
+
                 BaseCheckedException ex = (BaseCheckedException) e;
+                System.out.println("BaseCheckedException: " + ex.getErrorCode());
                 throw new PacketKeeperException(ex.getErrorCode(), ex.getMessage());
-            }
-            else if (e instanceof BaseUncheckedException) {
+
+            } else if (e instanceof BaseUncheckedException) {
+
                 BaseUncheckedException ex = (BaseUncheckedException) e;
+                System.out.println("BaseUncheckedException: " + ex.getErrorCode());
                 throw new PacketKeeperException(ex.getErrorCode(), ex.getMessage());
-            } else
-                throw new PacketKeeperException(PacketUtilityErrorCodes.PACKET_KEEPER_GET_ERROR.getErrorCode(),
-                    "Exception occured reading packet : " + e.getMessage(), e);
+
+            } else {
+
+                System.out.println("Unknown Exception. Throwing PacketKeeperException");
+                throw new PacketKeeperException(
+                        PacketUtilityErrorCodes.PACKET_KEEPER_GET_ERROR.getErrorCode(),
+                        "Exception occured reading packet : " + e.getMessage(),
+                        e);
+            }
         }
     }
 
