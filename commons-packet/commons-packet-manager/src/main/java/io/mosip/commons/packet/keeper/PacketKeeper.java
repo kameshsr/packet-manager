@@ -179,8 +179,8 @@ public class PacketKeeper {
 
             return packet;
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println(ExceptionUtils.getStackTrace(e));
+            System.out.println("error in line 182 "+e.getMessage());
+            System.out.println("next line "+ExceptionUtils.getStackTrace(e));
             LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, packetInfo.getId(), ExceptionUtils.getStackTrace(e));
             if (e.getMessage() != null && e.getMessage().contains(OBJECT_DOESNOT_EXISTS) && e.getMessage().contains(STATUS_404)) {
                 System.out.println("Object does not exist");
