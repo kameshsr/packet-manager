@@ -179,26 +179,19 @@ public class PacketKeeper {
 
             return packet;
         } catch (Exception e) {
-            System.out.println("error in line 182 "+e.getMessage());
-            System.out.println("next line "+ExceptionUtils.getStackTrace(e));
             LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, packetInfo.getId(), ExceptionUtils.getStackTrace(e));
             if (e.getMessage() != null && e.getMessage().contains(OBJECT_DOESNOT_EXISTS) && e.getMessage().contains(STATUS_404)) {
-                System.out.println("Object does not exist");
                 throw new ObjectDoesnotExistsException();
-            }
-            else if (e instanceof BaseCheckedException) {
-                System.out.println("Base checked exception");
+            } else if (e instanceof BaseCheckedException) {
                 BaseCheckedException ex = (BaseCheckedException) e;
                 throw new PacketKeeperException(ex.getErrorCode(), ex.getMessage());
-            }
-            else if (e instanceof BaseUncheckedException) {
-                System.out.println("Base unchecked exception");
+            } else if (e instanceof BaseUncheckedException) {
                 BaseUncheckedException ex = (BaseUncheckedException) e;
                 throw new PacketKeeperException(ex.getErrorCode(), ex.getMessage());
-            } else
-                System.out.println("Other exception");
+            } else {
                 throw new PacketKeeperException(PacketUtilityErrorCodes.PACKET_KEEPER_GET_ERROR.getErrorCode(),
                     "Exception occured reading packet : " + e.getMessage(), e);
+            }
         }
     }
 

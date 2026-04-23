@@ -138,8 +138,17 @@ public class PacketReaderImpl implements IPacketReader {
 					"Packet Validation exception : " + ExceptionUtils.getStackTrace(e));
 			if (e instanceof BaseCheckedException)
 				throw new PacketValidationFailureException(((BaseCheckedException) e).getMessage(), e);
-			else
-				throw new PacketValidationFailureException((e).getMessage(), e);
+			else if (e instanceof BaseUncheckedException)
+				throw new PacketValidationFailureException(e.getMessage(), e);
+			else {
+				// Unwrap wrapper exceptions (e.g. CompletionException) to preserve the original message
+				Throwable cause = e.getCause();
+				if (cause instanceof BaseCheckedException ex)
+					throw new PacketValidationFailureException(ex.getMessage(), e);
+				if (cause instanceof BaseUncheckedException ex)
+					throw new PacketValidationFailureException(ex.getMessage(), e);
+				throw new PacketValidationFailureException(e.getMessage(), e);
+			}
 		}
 	}
 
@@ -239,6 +248,10 @@ public class PacketReaderImpl implements IPacketReader {
 		} catch (CompletionException ce) {
 
 			Throwable cause = ce.getCause() != null ? ce.getCause() : ce;
+			// Unwrap nested CompletionExceptions to reach the actual cause
+			while (cause instanceof CompletionException && cause.getCause() != null) {
+				cause = cause.getCause();
+			}
 
 			LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
 					cause instanceof Exception
@@ -496,6 +509,9 @@ public class PacketReaderImpl implements IPacketReader {
 			}
 		} catch (CompletionException ce) {
 			Throwable cause = ce.getCause() != null ? ce.getCause() : ce;
+			while (cause instanceof CompletionException && cause.getCause() != null) {
+				cause = cause.getCause();
+			}
 			if (cause instanceof BaseCheckedException ex)
 				throw new GetAllMetaInfoException(ex.getErrorCode(), ex.getMessage());
 			if (cause instanceof BaseUncheckedException ex)
@@ -549,6 +565,9 @@ public class PacketReaderImpl implements IPacketReader {
 			}
 		} catch (CompletionException ce) {
 			Throwable cause = ce.getCause() != null ? ce.getCause() : ce;
+			while (cause instanceof CompletionException && cause.getCause() != null) {
+				cause = cause.getCause();
+			}
 			LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id,
 					cause instanceof Exception ? ExceptionUtils.getStackTrace((Exception) cause) : cause.toString());
 			if (cause instanceof BaseCheckedException ex)
