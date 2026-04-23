@@ -345,7 +345,19 @@ public class PacketReaderService {
     }
 
     private ObjectDto searchProcessWithLatestIteration(String id, String source, String process) {
-        List<ObjectDto> allObjects = packetReader.info(id);
+        List<ObjectDto> allObjects;
+        try {
+            allObjects = packetReader.info(id);
+        } catch (Exception e) {
+            LOGGER.error(PacketManagerLogger.SESSIONID, PacketManagerLogger.REGISTRATIONID, id, ExceptionUtils.getStackTrace(e));
+            if (e instanceof BaseUncheckedException)
+                throw (BaseUncheckedException) e;
+            else if (e instanceof BaseCheckedException) {
+                BaseCheckedException ex = (BaseCheckedException) e;
+                throw new BaseUncheckedException(ex.getErrorCode(), ex.getMessage(), ex);
+            } else
+                throw new BaseUncheckedException(PacketUtilityErrorCodes.UNKNOWN_EXCEPTION.getErrorCode(), e.getMessage(), e);
+        }
         Collections.sort(allObjects, (i1, i2) -> extractInt(i2.getProcess()) - (extractInt(i1.getProcess())));
 
         Optional<ObjectDto> objectDto = allObjects.stream().filter(obj ->
